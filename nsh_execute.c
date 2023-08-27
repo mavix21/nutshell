@@ -98,7 +98,7 @@ char *cmdfinder(char *command)
 	char *path = getenv("PATH");
 
 	if (access(command, F_OK) != -1)
-		return (command);
+		return (strdup(command));
 
 	if (path == NULL)
 		return (NULL);
