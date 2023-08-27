@@ -1,5 +1,4 @@
 #include "main.h"
-#include <string.h>
 
 /**
  * clear_nsh_info - resets some shell info struct fields 
@@ -14,7 +13,7 @@ void clear_nsh_info(nsh_info_t *nsh_info)
 	nsh_info->path = NULL;
 	nsh_info->argc = 0;
 	nsh_info->err_num = 0;
-	nsh_info->syntax_err_token = NULL;
+	memset(nsh_info->syntax_err_token, 0, 3);
 }
 
 void set_nsh_info(nsh_info_t *nsh_info, char **av)
