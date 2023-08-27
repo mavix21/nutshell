@@ -42,8 +42,8 @@
 #define UNUSED(x) (void)(x)
 
 #define INIT_NSH_INFO \
-{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\
-	NULL, NULL, 0, 1, 0, 0, 0, 0, 0}
+{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, { 0 }, NULL, NULL, NULL, NULL,\
+	NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0}
 
 extern char **environ;
 
@@ -100,7 +100,7 @@ typedef struct nsh_info
 	char *path;
 	char *filename;
 	char **environ;
-	char *syntax_err_token;
+	char syntax_err_token[3];
 	struct cmd *cmd_tree;
 	int (*func_builtin)(struct nsh_info *);
 	list_t *env;
@@ -109,6 +109,7 @@ typedef struct nsh_info
 	list_t *jobs;
 	int argc;
 	unsigned int line_count;
+	unsigned int syntax_err_line;
 	int err_num;
 	int env_changed;
 	int status;
