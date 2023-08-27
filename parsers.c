@@ -45,34 +45,45 @@ struct cmd *parseline(nsh_info_t *nsh_info)
 	struct cmd *cmd;
 	struct execcmd *ecmd;
 	char **ps = &(nsh_info->line);
-	// char tok;
+	char tok;
+	int i = 0;
 
 	cmd = parsepipe(nsh_info);
 	while (peek(ps, nsh_info->end_of_line, "&"))
 	{
 		gettoken(ps, nsh_info->end_of_line, 0);
-		// cmd = backcmd(cmd);
 		ecmd = (struct execcmd *)cmd;
 		ecmd->run_in_bg = 1;
 	}
 
 	while (peek(ps, nsh_info->end_of_line, ";\n"))
 	{
-		if (**ps == '\n')
+		tok = gettoken(ps, nsh_info->end_of_line, 0);
+		if (*ps == nsh_info->end_of_line)
+			return (cmd);
+
+		if (tok == '\n')
 			nsh_info->line_count++;
 
-		gettoken(ps, nsh_info->end_of_line, 0);
-		if (**ps == ';')
+		if (strchr("&|);", **ps))
 		{
-			nsh_info->syntax_err_token = ";;";
+			if (tok == ';')
+				nsh_info->syntax_err_token[i++] = ';';
+
+			nsh_info->syntax_err_token[i++] = **ps;
+			nsh_info->syntax_err_line = nsh_info->line_count;
+			if (gettoken(ps, nsh_info->end_of_line, 0) == 0)
+				return (cmd);
+
+			if (strchr("&|);", **ps) && tok != ';')
+				nsh_info->syntax_err_token[i++] = **ps;
+
 			print_syntax_error(nsh_info);
+			*ps = nsh_info->end_of_line;
 			return (cmd);
 		}
 		else if (**ps == '\n')
 			continue;
-
-		if (*ps == nsh_info->end_of_line)
-			return (cmd);
 
 		cmd = listcmd(cmd, parseline(nsh_info));
 	}
