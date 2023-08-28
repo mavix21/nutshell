@@ -25,8 +25,12 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			child_pid = forking();
 			if (child_pid == 0)
 			{
-				if (nsh_info->syntax_err_token != NULL)
+				if ((ecmd->line_number == nsh_info->syntax_err_line) && \
+						(nsh_info->syntax_err_token[0] != '\0'))
+				{
+					print_syntax_error(nsh_info);
 					freexit(nsh_info, 2, 0);
+				}
 
 				if (ecmd->path_to_file == NULL)
 				{
@@ -47,10 +51,15 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			break;
 
 		case BUILTIN:
-			if (nsh_info->syntax_err_token != NULL)
-				break;
-
 			ecmd = (struct execcmd *)cmd;
+
+			if ((ecmd->line_number == nsh_info->syntax_err_line) && \
+					(nsh_info->syntax_err_token[0] != '\0'))
+			{
+				print_syntax_error(nsh_info);
+				break;
+			}
+
 			nsh_info->argv = ecmd->argv;
 
 			if (ecmd->run_in_bg && forking() == 0)
