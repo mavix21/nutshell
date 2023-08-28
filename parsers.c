@@ -9,8 +9,10 @@
  */
 struct cmd *parsecmd(nsh_info_t *nsh_info)
 {
-	struct cmd *cmd;
+	struct cmd *cmd = NULL;
 	char *dummy, *s;
+	int i = 0;
+	char tok;
 
 	nsh_info->start_of_line = nsh_info->line;
 	s = nsh_info->line;
@@ -23,6 +25,19 @@ struct cmd *parsecmd(nsh_info_t *nsh_info)
 
 	nsh_info->line = s;
 	nsh_info->end_of_line = s + strlen(s);
+	if (strchr("&|);", *s))
+	{
+		tok = gettoken(&s, nsh_info->end_of_line, 0);
+		nsh_info->syntax_err_token[i++] = tok;
+		nsh_info->syntax_err_line = nsh_info->line_count;
+
+		if (*s == ';' && tok == ';') 
+			nsh_info->syntax_err_token[i++] = *s;
+
+		print_syntax_error(nsh_info);
+		s = nsh_info->end_of_line;
+		return (cmd);
+	}
 	cmd = parseline(nsh_info);
 
 	dummy = strtok(nsh_info->start_of_line, NULTERMINATE);
@@ -35,8 +50,6 @@ struct cmd *parsecmd(nsh_info_t *nsh_info)
 /**
  * parseline - builds a node of type struct listcmd
  * @nsh_info: main shell info struct
- * @ps: pointer to string
- * @es: end of string
  *
  * Return: pointer to command tree
  */
@@ -78,7 +91,6 @@ struct cmd *parseline(nsh_info_t *nsh_info)
 			if (strchr("&|);", **ps) && tok != ';')
 				nsh_info->syntax_err_token[i++] = **ps;
 
-			print_syntax_error(nsh_info);
 			*ps = nsh_info->end_of_line;
 			return (cmd);
 		}
