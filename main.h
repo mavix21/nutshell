@@ -154,6 +154,8 @@ struct execcmd
 	int line_number;
 	int status;
 	int run_in_bg;
+	int *write_to_fd;
+	int *read_from_fd;
 	int (*func_builtin)(nsh_info_t *);
 	char *argv[MAXARGS];
 	char *path_to_file;
