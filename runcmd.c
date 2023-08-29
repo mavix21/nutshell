@@ -1,16 +1,17 @@
 #include "main.h"
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 {
-	// int p[2];
+	int p[2];
 	pid_t child_pid;
 	int builtin_ret = 0;
 	struct execcmd *ecmd;
 	struct listcmd *lcmd;
-	// struct pipecmd *pcmd;
+	struct pipecmd *pcmd;
 	// struct redircmd *rcmd;
 
 	if (cmd == 0)
@@ -38,6 +39,19 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 					freexit(nsh_info, 127, 0);
 				}
 
+				if (ecmd->write_to_fd)
+				{
+					dup2(ecmd->write_to_fd[1], STDOUT_FILENO);
+					close(ecmd->write_to_fd[0]);
+					close(ecmd->write_to_fd[1]);
+				}
+				else if (ecmd->read_from_fd)
+				{
+					dup2(ecmd->read_from_fd[0], STDIN_FILENO);
+					close(ecmd->read_from_fd[0]);
+					close(ecmd->read_from_fd[1]);
+				}
+
 				execve(ecmd->path_to_file, ecmd->argv, environ);
 				print_error(nsh_info, "exec failed");
 				exit(EXIT_FAILURE);
@@ -46,7 +60,12 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			if (ecmd->run_in_bg && ecmd->path_to_file)
 				add_job(nsh_info, child_pid);
 			else
-				wait(0);
+			{
+				if (ecmd->read_from_fd)
+					close(ecmd->read_from_fd[1]);
+
+				waitpid(child_pid, NULL, 0);
+			}
 
 			break;
 
@@ -78,8 +97,25 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			runcmd(nsh_info, lcmd->right);
 			break;
 
+		case PIPE:
+			pcmd = (struct pipecmd *)cmd;
+			if (pipe(p) < 0)
+			{
+				perror("pipe");
+				break;
+			}
+
+			((struct execcmd *)pcmd->left)->write_to_fd = p;
+			((struct execcmd *)pcmd->right)->read_from_fd = p;
+			runcmd(nsh_info, pcmd->left);
+			runcmd(nsh_info, pcmd->right);
+
+			close(p[0]);
+			close(p[1]);
+			break;
+
 		default:
-			perror("runcmd");
+			// perror("runcmd");
 			break;
 	}
 
