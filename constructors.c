@@ -11,6 +11,8 @@ struct cmd *execcmd()
 
 	cmd = malloc(sizeof(*cmd));
 	memset(cmd, 0, sizeof(*cmd));
+	cmd->write_to_fd = NULL;
+	cmd->read_from_fd = NULL;
 
 	return ((struct cmd *)cmd);
 }
