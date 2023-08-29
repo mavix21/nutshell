@@ -1,4 +1,5 @@
 #include "main.h"
+#include <unistd.h>
 
 /**
  * forking - forks the current process
@@ -29,4 +30,11 @@ void handle_sigint(int sig_num)
 	(void) sig_num;
 	signal(SIGINT, &handle_sigint);
 	write(1, "\n$ ", 3);
+}
+
+void replace_stdio(int *p, int fd)
+{
+	dup2(p[fd], fd);
+	close(p[0]);
+	close(p[1]);
 }
