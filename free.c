@@ -18,6 +18,7 @@ void free_tree(struct cmd *cmd)
 {
 	struct execcmd *ecmd;
 	struct listcmd *lcmd;
+	struct pipecmd *pcmd;
 
 	if (cmd == NULL)
 		return;
@@ -33,11 +34,16 @@ void free_tree(struct cmd *cmd)
 
 		case LIST:
 			lcmd = (struct listcmd *)cmd;
-			if (lcmd->left != NULL)
-				free_tree(lcmd->left);
-			if (lcmd->right != NULL)
-				free_tree(lcmd->right);
+			free_tree(lcmd->left);
+			free_tree(lcmd->right);
 			free(lcmd);
+			break;
+
+		case PIPE:
+			pcmd = (struct pipecmd *)cmd;
+			free_tree(pcmd->left);
+			free_tree(pcmd->right);
+			free(pcmd);
 			break;
 	}
 }
