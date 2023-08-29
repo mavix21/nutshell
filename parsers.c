@@ -186,7 +186,7 @@ struct cmd *parseredirs(nsh_info_t *nsh_info, struct cmd *cmd)
 		tok = gettoken(ps, nsh_info->end_of_line, 0);
 		if (gettoken(ps, nsh_info->end_of_line, &q) != 'a')
 		{
-			// TODO (error message)
+			perror("redirection");
 			return (cmd);
 		}
 

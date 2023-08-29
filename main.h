@@ -141,6 +141,8 @@ struct cmd
  * @line_number: line where the command was found in (when reading from a file)
  * @status: status of the executed command
  * @run_in_bg: 1 if commnad has to be executed in the background, 0 otherwise
+ * @fd_to_write_to: file descriptor to write to (used for pipes)
+ * @fd_to_read_from: file descriptor to read from (used for pipes)
  * @func_builtin: pointer to the builtin function
  * @argv: array of arguments
  * @path_to_file: absolute path to the program to be run (if not a builtin)
@@ -154,8 +156,8 @@ struct execcmd
 	int line_number;
 	int status;
 	int run_in_bg;
-	int *write_to_fd;
-	int *read_from_fd;
+	int *fd_to_write_to;
+	int *fd_to_read_from;
 	int (*func_builtin)(nsh_info_t *);
 	char *argv[MAXARGS];
 	char *path_to_file;
@@ -222,6 +224,7 @@ char gettoken(char **ps, char *es, char **q);
 // process
 pid_t forking(void);
 void handle_sigint(int sig_num);
+void replace_stdio(int *p, int fd);
 
 // nsh_info
 void clear_nsh_info(nsh_info_t *nsh_info);
