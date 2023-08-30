@@ -43,7 +43,7 @@
 
 #define INIT_NSH_INFO \
 { NULL, NULL, NULL, NULL, NULL, NULL, NULL, { 0 }, NULL, NULL, NULL, NULL,\
-	NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0}
+	NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0}
 
 extern char **environ;
 
@@ -110,6 +110,7 @@ typedef struct nsh_info
 	int argc;
 	unsigned int line_count;
 	unsigned int syntax_err_line;
+	int main_pid;
 	int err_num;
 	int env_changed;
 	int status;
