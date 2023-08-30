@@ -12,7 +12,7 @@ struct cmd *execcmd()
 	cmd = malloc(sizeof(*cmd));
 	memset(cmd, 0, sizeof(*cmd));
 	cmd->fd_to_write_to = NULL;
-	cmd->fd_to_read_fromL;
+	cmd->fd_to_read_from = NULL;
 
 	return ((struct cmd *)cmd);
 }
