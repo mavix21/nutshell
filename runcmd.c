@@ -12,7 +12,7 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 	struct execcmd *ecmd;
 	struct listcmd *lcmd;
 	struct pipecmd *pcmd;
-	// struct redircmd *rcmd;
+	struct redircmd *rcmd;
 
 	if (cmd == 0)
 		return(1);
@@ -39,18 +39,10 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 					freexit(nsh_info, 127, 0);
 				}
 
-				if (ecmd->write_to_fd)
-				{
-					dup2(ecmd->write_to_fd[1], STDOUT_FILENO);
-					close(ecmd->write_to_fd[0]);
-					close(ecmd->write_to_fd[1]);
-				}
-				else if (ecmd->read_from_fd)
-				{
-					dup2(ecmd->read_from_fd[0], STDIN_FILENO);
-					close(ecmd->read_from_fd[0]);
-					close(ecmd->read_from_fd[1]);
-				}
+				if (ecmd->fd_to_write_to)
+					replace_stdio(ecmd->fd_to_write_to, STDOUT_FILENO);
+				else if (ecmd->fd_to_read_from)
+					replace_stdio(ecmd->fd_to_read_from, STDIN_FILENO);
 
 				execve(ecmd->path_to_file, ecmd->argv, environ);
 				print_error(nsh_info, "exec failed");
@@ -61,8 +53,8 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 				add_job(nsh_info, child_pid);
 			else
 			{
-				if (ecmd->read_from_fd)
-					close(ecmd->read_from_fd[1]);
+				if (ecmd->fd_to_read_from)
+					close(ecmd->fd_to_read_from[1]);
 
 				waitpid(child_pid, NULL, 0);
 			}
@@ -105,8 +97,8 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 				break;
 			}
 
-			((struct execcmd *)pcmd->left)->write_to_fd = p;
-			((struct execcmd *)pcmd->right)->read_from_fd = p;
+			((struct execcmd *)pcmd->left)->fd_to_write_to = p;
+			((struct execcmd *)pcmd->right)->fd_to_read_from = p;
 			runcmd(nsh_info, pcmd->left);
 			runcmd(nsh_info, pcmd->right);
 
@@ -114,8 +106,18 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			close(p[1]);
 			break;
 
+		case REDIR:
+			rcmd = (struct redircmd *)cmd;
+			close(rcmd->fd);
+			if (open(rcmd->file, rcmd->mode) < 0)
+			{
+				fprintf(stderr, "open %s failed\n", rcmd->file);
+				exit(127);
+			}
+			break;
+
 		default:
-			// perror("runcmd");
+			perror("runcmd");
 			break;
 	}
 
