@@ -1,18 +1,22 @@
 #include "main.h"
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 {
 	int p[2];
 	pid_t child_pid;
-	int builtin_ret = 0;
+	// int builtin_ret = 0;
 	struct execcmd *ecmd;
 	struct listcmd *lcmd;
 	struct pipecmd *pcmd;
 	struct redircmd *rcmd;
+	union sigval value;
+	unsigned char buffer[sizeof(*nsh_info)];
+	sigset_t set;
+	int sig;
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGUSR2);
 
 	if (cmd == 0)
 		return(1);
@@ -41,7 +45,8 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 
 				if (ecmd->fd_to_write_to)
 					replace_stdio(ecmd->fd_to_write_to, STDOUT_FILENO);
-				else if (ecmd->fd_to_read_from)
+
+				if (ecmd->fd_to_read_from)
 					replace_stdio(ecmd->fd_to_read_from, STDIN_FILENO);
 
 				execve(ecmd->path_to_file, ecmd->argv, environ);
@@ -62,9 +67,18 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			break;
 
 		case BUILTIN:
-			ecmd = (struct execcmd *)cmd;
+                        ecmd = (struct execcmd *)cmd;
 
-			if ((ecmd->line_number == nsh_info->syntax_err_line) && \
+			nsh_info->argv = ecmd->argv;
+			serialize_nsh_info(*nsh_info, buffer);
+			write(nsh_info->pipe[1], buffer, sizeof(*nsh_info));
+
+			value.sival_ptr = ecmd->argv[0];
+			sigprocmask(SIG_BLOCK, &set, NULL);
+			sigqueue(nsh_info->main_pid, SIGUSR1, value);
+
+                        sigwait(&set, &sig);
+			/* if ((ecmd->line_number == nsh_info->syntax_err_line) && \
 					(nsh_info->syntax_err_token[0] != '\0'))
 			{
 				print_syntax_error(nsh_info);
@@ -79,7 +93,7 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 				builtin_ret = ecmd->func_builtin(nsh_info);
 
 			if (builtin_ret < 0)
-				nsh_info->status = 1;
+				nsh_info->status = 1; */
 
 			break;
 
@@ -98,7 +112,10 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			}
 
 			((struct execcmd *)pcmd->left)->fd_to_write_to = p;
-			((struct execcmd *)pcmd->right)->fd_to_read_from = p;
+			if (pcmd->right->type == PIPE)
+				((struct execcmd *)((struct pipecmd *)pcmd->right)->left)->fd_to_read_from = p;
+			else
+				((struct execcmd *)pcmd->right)->fd_to_read_from = p;
 			runcmd(nsh_info, pcmd->left);
 			runcmd(nsh_info, pcmd->right);
 
