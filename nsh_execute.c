@@ -9,16 +9,69 @@ builtin_t nsh_bins[] = {
 	{NULL, NULL}
 };
 
+int (*builtin_func)(nsh_info_t *nsh_info) = NULL;
+volatile pid_t caller_pid = -1;
+
+void handle_sigusr(int signo, siginfo_t *info, void *context)
+{
+	int i;
+	char *builtin_name = (char *)info->si_ptr;
+	printf("Received signal from process with PID: %d\n", info->si_pid);
+	printf("Builtin: %s\n", builtin_name);
+	for (i = 0; nsh_bins[i].builtin != NULL; i++)
+	{
+		if (strcmp(nsh_bins[i].builtin, builtin_name) == 0)
+		{
+			builtin_func = nsh_bins[i].f;
+			caller_pid = info->si_pid;
+			break;
+		}
+
+	}
+}
+
 int nsh_execute(nsh_info_t *nsh_info)
 {
-	// char *es, *anchor, *dummy;
+	struct sigaction sa;
 	struct cmd *cmd;
+	pid_t child_pid, wpid;
+	int status;
+	int p[2];
+	unsigned char buffer[sizeof(*nsh_info)];
 
 	cmd = parsecmd(nsh_info);
 	set_program_or_builtin(cmd);
 	nsh_info->cmd_tree = cmd;
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = handle_sigusr;
+	sigaction(SIGUSR1, &sa, NULL);
 
-	return (runcmd(nsh_info, cmd));
+	pipe(p);
+	child_pid = forking();
+	if (child_pid == 0)
+	{
+		close(p[0]);
+		nsh_info->pipe = p;
+		nsh_info->main_pid = getppid();
+		return (runcmd(nsh_info, cmd));
+	}
+	else do
+	{
+		if (builtin_func != NULL && caller_pid > 0)
+		{
+			read(p[0], buffer, sizeof(*nsh_info));
+			deserialize_nsh_info(buffer, nsh_info);
+			builtin_func(nsh_info);
+			builtin_func = NULL;
+			kill(caller_pid, SIGUSR2);
+			caller_pid = -1;
+		}
+		wpid = waitpid(child_pid, &status, 0);
+	} while (wpid <= 0 || !WIFEXITED(status));
+
+	close(p[1]);
+
+	return (EXIT_SUCCESS);
 }
 
 void set_program_or_builtin(struct cmd *cmd)
