@@ -43,7 +43,7 @@
 
 #define INIT_NSH_INFO \
 { NULL, NULL, NULL, NULL, NULL, NULL, NULL, { 0 }, NULL, NULL, NULL, NULL,\
-	NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0}
+	NULL, NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0}
 
 extern char **environ;
 
@@ -107,6 +107,7 @@ typedef struct nsh_info
 	list_t *history;
 	list_t *alias;
 	list_t *jobs;
+	int *pipe;
 	int argc;
 	unsigned int line_count;
 	unsigned int syntax_err_line;
@@ -292,5 +293,9 @@ struct cmd *listcmd(struct cmd *left, struct cmd *right);
 struct cmd *redircmd(struct cmd *subcmd, char *file, int mode, int fd);
 struct cmd *backcmd(struct cmd *subcmd);
 struct cmd *pipecmd(struct cmd *left, struct cmd *right);
+
+// serialize
+void serialize_nsh_info(nsh_info_t data, unsigned char *buffer);
+void deserialize_nsh_info(unsigned char *buffer, nsh_info_t *data);
 
 #endif
