@@ -90,9 +90,6 @@ struct cmd *redircmd(struct cmd *subcmd, char *file, int mode, int fd)
 struct cmd *backcmd(struct cmd *subcmd)
 {
 	struct backcmd *cmd;
-	struct execcmd *ecmd;
-
-	ecmd = (struct execcmd *)subcmd;
 
 	cmd = malloc(sizeof(*cmd));
 	memset(cmd, 0, sizeof(*cmd));
