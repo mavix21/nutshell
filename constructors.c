@@ -11,14 +11,13 @@ struct cmd *execcmd()
 
 	cmd = malloc(sizeof(*cmd));
 	memset(cmd, 0, sizeof(*cmd));
-	cmd->fd_to_write_to = NULL;
-	cmd->fd_to_read_from = NULL;
 
 	return ((struct cmd *)cmd);
 }
 
 /**
  * listcmd - allocates memory for a structure of type struct listcmd
+ *
  * @left: pointer to a command tree which be executed first
  * @right: pointer to a command tree which be executed second
  *
@@ -37,6 +36,14 @@ struct cmd *listcmd(struct cmd *left, struct cmd *right)
 	return ((struct cmd *)cmd);
 }
 
+/**
+ * pipecmd - allocates memory for a structure of type struct pipecmd
+ *
+ * @left: pointer to a command tree which will write to a pipe
+ * @right: pointer to a command tree which will read from a pipe
+ *
+ * Return: pointer to structure of type struct cmd
+ */
 struct cmd *pipecmd(struct cmd *left, struct cmd *right)
 {
 	struct pipecmd *cmd;
@@ -50,6 +57,15 @@ struct cmd *pipecmd(struct cmd *left, struct cmd *right)
 	return (struct cmd *)cmd;
 }
 
+/**
+ * redircmd - allocates memory for a structure of type struct redircmd
+ * @subcmd: pointer to a command tree which will write to a file
+ * @file: filename to write
+ * @mode: access file mode
+ * @fd: stidn or stdout
+ *
+ * Return: pointer to structure of type struct cmd
+ */
 struct cmd *redircmd(struct cmd *subcmd, char *file, int mode, int fd)
 {
 	struct redircmd *cmd;
@@ -65,13 +81,18 @@ struct cmd *redircmd(struct cmd *subcmd, char *file, int mode, int fd)
 	return (struct cmd *)cmd;
 }
 
+/**
+ * backcmd - allocates memory for a structure of type struct backcmd
+ * @subcmd: pointer to a command tree which will be executed in the background
+ *
+ * Return: pointer to structure of type struct cmd
+ */
 struct cmd *backcmd(struct cmd *subcmd)
 {
 	struct backcmd *cmd;
 	struct execcmd *ecmd;
 
 	ecmd = (struct execcmd *)subcmd;
-	ecmd->run_in_bg = 1;
 
 	cmd = malloc(sizeof(*cmd));
 	memset(cmd, 0, sizeof(*cmd));
