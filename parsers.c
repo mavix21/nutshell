@@ -56,7 +56,6 @@ struct cmd *parsecmd(nsh_info_t *nsh_info)
 struct cmd *parseline(nsh_info_t *nsh_info)
 {
 	struct cmd *cmd;
-	struct execcmd *ecmd;
 	char **ps = &(nsh_info->line);
 	char tok;
 	int i = 0;
@@ -65,8 +64,7 @@ struct cmd *parseline(nsh_info_t *nsh_info)
 	while (peek(ps, nsh_info->end_of_line, "&"))
 	{
 		gettoken(ps, nsh_info->end_of_line, 0);
-		ecmd = (struct execcmd *)cmd;
-		ecmd->run_in_bg = 1;
+		cmd = backcmd(cmd);
 	}
 
 	while (peek(ps, nsh_info->end_of_line, ";\n"))
