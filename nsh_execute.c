@@ -9,69 +9,76 @@ builtin_t nsh_bins[] = {
 	{NULL, NULL}
 };
 
-int (*builtin_func)(nsh_info_t *nsh_info) = NULL;
-volatile pid_t caller_pid = -1;
-
-void handle_sigusr(int signo, siginfo_t *info, void *context)
+/**
+ * handle_builtin: Handles signal SIGUSR1 sent from a child process. Child may
+ * send a SIGUSR1 when it encounters a builtin node, along with the necessary
+ * data for the parent to be able to execute the builtin function.
+ *
+ * @signo: the signal received, in this case, SIGUSR1
+ * @info: pointer to structure containing further information about the signal 
+ * @context: pointer to structure containing signal context information.
+ */
+void handle_builtin(int signo, siginfo_t *info, void *context)
 {
-	int i;
-	char *builtin_name = (char *)info->si_ptr;
-	printf("Received signal from process with PID: %d\n", info->si_pid);
-	printf("Builtin: %s\n", builtin_name);
-	for (i = 0; nsh_bins[i].builtin != NULL; i++)
-	{
-		if (strcmp(nsh_bins[i].builtin, builtin_name) == 0)
-		{
-			builtin_func = nsh_bins[i].f;
-			caller_pid = info->si_pid;
-			break;
-		}
+	nsh_info_t nsh_info;
+	int fd = info->si_int; // file descriptor the child has written to
+	unsigned char buffer[sizeof(nsh_info_t)] = { 0 };
 
-	}
+	// read the data the child have written to `fd`
+	read(fd, buffer, sizeof(nsh_info));
+
+	// deserialize the bytes into an actual structure of type nsh_info_t
+	deserialize_nsh_info(buffer, &nsh_info);
+
+	// parent executes the builtin function sent from the child
+	nsh_info.func_builtin(&nsh_info);
+
+	// clean buffer
+	memset(buffer, 0, sizeof(nsh_info_t));
+
+	// notifies child that execution is over
+	kill(info->si_pid, SIGUSR2);
 }
 
 int nsh_execute(nsh_info_t *nsh_info)
 {
 	struct sigaction sa;
 	struct cmd *cmd;
+	sigset_t ss;
 	pid_t child_pid, wpid;
-	int status;
+	int wait_status, run_status = 1, pipe_status;
 	int p[2];
-	unsigned char buffer[sizeof(*nsh_info)];
 
 	cmd = parsecmd(nsh_info);
 	set_program_or_builtin(cmd);
 	nsh_info->cmd_tree = cmd;
 	sa.sa_flags = SA_SIGINFO;
-	sa.sa_sigaction = handle_sigusr;
+	sa.sa_sigaction = handle_builtin;
+	sigemptyset(&ss);
+	sa.sa_mask = ss;
 	sigaction(SIGUSR1, &sa, NULL);
 
-	pipe(p);
+	pipe_status = pipe(p);
+	if (pipe_status < 0)
+		return (2);
+
+	nsh_info->pipe = p;
+
 	child_pid = forking();
 	if (child_pid == 0)
 	{
 		close(p[0]);
-		nsh_info->pipe = p;
 		nsh_info->main_pid = getppid();
-		return (runcmd(nsh_info, cmd));
+		run_status =  runcmd(nsh_info, cmd);
 	}
 	else do
 	{
-		if (builtin_func != NULL && caller_pid > 0)
-		{
-			read(p[0], buffer, sizeof(*nsh_info));
-			deserialize_nsh_info(buffer, nsh_info);
-			builtin_func(nsh_info);
-			builtin_func = NULL;
-			kill(caller_pid, SIGUSR2);
-			caller_pid = -1;
-		}
-		wpid = waitpid(child_pid, &status, 0);
-	} while (wpid <= 0 || !WIFEXITED(status));
+		wpid = waitpid(child_pid, &wait_status, 0);
+	} while (wpid <= 0 || !WIFEXITED(wait_status));
 
 	close(p[1]);
 
-	return (EXIT_SUCCESS);
+	return (run_status);
 }
 
 void set_program_or_builtin(struct cmd *cmd)
@@ -80,6 +87,7 @@ void set_program_or_builtin(struct cmd *cmd)
 	struct listcmd *lcmd;
 	struct pipecmd *pcmd;
 	struct redircmd *rcmd;
+	struct backcmd *bcmd;
 	char *command = NULL;
 
 	if (cmd == 0)
@@ -100,23 +108,33 @@ void set_program_or_builtin(struct cmd *cmd)
 				ecmd->type = PROGRAM;
 				ecmd->path_to_file = cmdfinder(ecmd->argv[0]);
 			}
+
 			return;
 
 		case REDIR:
 			rcmd = (struct redircmd*)cmd;
 			set_program_or_builtin(rcmd->cmd);
+
 			break;
 
 		case LIST:
 			lcmd = (struct listcmd *)cmd;
 			set_program_or_builtin(lcmd->left);
 			set_program_or_builtin(lcmd->right);
+
 			break;
 
 		case PIPE:
 			pcmd = (struct pipecmd *)cmd;
 			set_program_or_builtin(pcmd->left);
 			set_program_or_builtin(pcmd->right);
+
+			break;
+
+		case BACK:
+			bcmd = (struct backcmd *)cmd;
+			set_program_or_builtin(bcmd->cmd);
+
 			break;
 	}
 }
