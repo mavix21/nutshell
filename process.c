@@ -29,7 +29,7 @@ void handle_sigint(int sig_num)
 {
 	(void) sig_num;
 	signal(SIGINT, &handle_sigint);
-	write(1, "\n$ ", 3);
+	write(1, "\n[nsh]$ ", 8);
 }
 
 void replace_stdio(int *p, int fd)
