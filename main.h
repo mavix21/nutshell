@@ -1,5 +1,5 @@
-#ifndef H_NUTSHELL
-#define H_NUTSHELL
+#ifndef NUTSHELL_H_
+#define NUTSHELL_H_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,35 +15,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <asm-generic/errno-base.h>
-
-#define BUILTIN 0
-#define PROGRAM 1
-#define EXEC 2
-#define REDIR 3
-#define PIPE 4
-#define LIST 5
-#define BACK 6
-
-#define MAXARGS 20
-#define MAXJOBS 120
-#define BUFSIZE 120
-#define READ_BUFSIZE 1024
-#define WRITE_BUFSIZE 1024
-#define BUF_FLUSH -1
-
-#define AT_INDEX 0
-#define AT_VALUE 1
-
-#define WHITESPACE " \t\r\n\a\v\f"
-#define DELIM " \t\r\a\v\f"
-#define SYMBOLS "<|>&;()\n"
-#define NULTERMINATE " \t\r\a\v\f\n<|>&;()"
-
-#define UNUSED(x) (void)(x)
-
-#define INIT_NSH_INFO \
-{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, { 0 }, NULL, NULL, NULL, NULL,\
-	NULL, NULL, NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0}
+#include "constants.h"
 
 extern char **environ;
 
@@ -157,9 +129,6 @@ struct execcmd
 	int type;
 	int line_number;
 	int status;
-	int run_in_bg;
-	int *fd_to_write_to;
-	int *fd_to_read_from;
 	int (*func_builtin)(nsh_info_t *);
 	char *argv[MAXARGS];
 	char *path_to_file;
