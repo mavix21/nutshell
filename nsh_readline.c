@@ -14,6 +14,9 @@ char *nsh_readline(nsh_info_t *nsh_info)
 	char *line = NULL;
 	int i;
 
+	/* Catch SIGINT (CTRL + C) signal */
+	signal(SIGINT, &handle_sigint);
+
 	linelen = _getline(nsh_info, &line, &bufsize);
 
 	if (linelen <= 0)
