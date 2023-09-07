@@ -127,7 +127,7 @@ struct cmd
 struct execcmd
 {
 	int type;
-	int line_number;
+	unsigned int line_number;
 	int status;
 	int (*func_builtin)(nsh_info_t *);
 	char *argv[MAXARGS];
