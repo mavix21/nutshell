@@ -1,18 +1,18 @@
 #include "main.h"
-#include <signal.h>
 
 int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 {
 	int p[2];
-	pid_t child_pid;
 	// int builtin_ret = 0;
 	struct execcmd *ecmd;
 	struct listcmd *lcmd;
 	struct pipecmd *pcmd;
 	struct redircmd *rcmd;
-	union sigval value;
-	unsigned char buffer[sizeof(*nsh_info)];
+	struct backcmd *bcmd;
+	union sigval value =  { 0 };
+	unsigned char buffer[sizeof(*nsh_info)] = { 0 };
 	sigset_t set;
+	pid_t child_pid;
 	int sig;
 
 	sigemptyset(&set);
@@ -27,58 +27,28 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			ecmd = (struct execcmd *)cmd;
 			nsh_info->argv = ecmd->argv;
 
-			child_pid = forking();
-			if (child_pid == 0)
+			if ((ecmd->line_number == nsh_info->syntax_err_line) && \
+					(nsh_info->syntax_err_token[0] != '\0'))
 			{
-				if ((ecmd->line_number == nsh_info->syntax_err_line) && \
-						(nsh_info->syntax_err_token[0] != '\0'))
-				{
-					print_syntax_error(nsh_info);
-					freexit(nsh_info, 2, 0);
-				}
-
-				if (ecmd->path_to_file == NULL)
-				{
-					print_error(nsh_info, "command not found");
-					freexit(nsh_info, 127, 0);
-				}
-
-				if (ecmd->fd_to_write_to)
-					replace_stdio(ecmd->fd_to_write_to, STDOUT_FILENO);
-
-				if (ecmd->fd_to_read_from)
-					replace_stdio(ecmd->fd_to_read_from, STDIN_FILENO);
-
-				execve(ecmd->path_to_file, ecmd->argv, environ);
-				print_error(nsh_info, "exec failed");
-				exit(EXIT_FAILURE);
+				print_syntax_error(nsh_info);
+				freexit(nsh_info, 2, 0);
 			}
 
-			if (ecmd->run_in_bg && ecmd->path_to_file)
-				add_job(nsh_info, child_pid);
-			else
+			if (ecmd->path_to_file == NULL)
 			{
-				if (ecmd->fd_to_read_from)
-					close(ecmd->fd_to_read_from[1]);
-
-				waitpid(child_pid, NULL, 0);
+				print_error(nsh_info, "command not found");
+				freexit(nsh_info, 127, 0);
 			}
+
+			execve(ecmd->path_to_file, ecmd->argv, environ);
+			print_error(nsh_info, "exec failed");
 
 			break;
 
 		case BUILTIN:
                         ecmd = (struct execcmd *)cmd;
 
-			nsh_info->argv = ecmd->argv;
-			serialize_nsh_info(*nsh_info, buffer);
-			write(nsh_info->pipe[1], buffer, sizeof(*nsh_info));
-
-			value.sival_ptr = ecmd->argv[0];
-			sigprocmask(SIG_BLOCK, &set, NULL);
-			sigqueue(nsh_info->main_pid, SIGUSR1, value);
-
-                        sigwait(&set, &sig);
-			/* if ((ecmd->line_number == nsh_info->syntax_err_line) && \
+			if ((ecmd->line_number == nsh_info->syntax_err_line) && \
 					(nsh_info->syntax_err_token[0] != '\0'))
 			{
 				print_syntax_error(nsh_info);
@@ -86,20 +56,25 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			}
 
 			nsh_info->argv = ecmd->argv;
+			nsh_info->func_builtin = ecmd->func_builtin;
+			serialize_nsh_info(*nsh_info, buffer);
+			write(nsh_info->pipe[1], buffer, sizeof(*nsh_info));
 
-			if (ecmd->run_in_bg && forking() == 0)
-				ecmd->func_builtin(nsh_info);
-			else
-				builtin_ret = ecmd->func_builtin(nsh_info);
+			value.sival_int = nsh_info->pipe[0];
+			sigprocmask(SIG_BLOCK, &set, NULL);
+			sigqueue(nsh_info->main_pid, SIGUSR1, value);
 
-			if (builtin_ret < 0)
-				nsh_info->status = 1; */
+                        sigwait(&set, &sig);
 
-			break;
+			memset(buffer, 0, sizeof(*nsh_info));
+
+			exit(EXIT_SUCCESS);
 
 		case LIST:
 			lcmd = (struct listcmd *)cmd;
-			runcmd(nsh_info, lcmd->left);
+			if (forking() == 0)
+				runcmd(nsh_info, lcmd->left);
+			wait(0);
 			runcmd(nsh_info, lcmd->right);
 			break;
 
@@ -111,16 +86,27 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 				break;
 			}
 
-			((struct execcmd *)pcmd->left)->fd_to_write_to = p;
-			if (pcmd->right->type == PIPE)
-				((struct execcmd *)((struct pipecmd *)pcmd->right)->left)->fd_to_read_from = p;
-			else
-				((struct execcmd *)pcmd->right)->fd_to_read_from = p;
-			runcmd(nsh_info, pcmd->left);
-			runcmd(nsh_info, pcmd->right);
+			if (forking() == 0)
+			{
+				dup2(p[1], STDOUT_FILENO);
+				close(p[0]);
+				close(p[1]);
+				runcmd(nsh_info, pcmd->left);
+			}
+			else 
+			{
+				dup2(p[0], STDIN_FILENO);
+				close(p[0]);
+				close(p[1]);
+				runcmd(nsh_info, pcmd->right);
+			}
 
 			close(p[0]);
 			close(p[1]);
+
+			wait(0);
+			wait(0);
+
 			break;
 
 		case REDIR:
@@ -131,6 +117,18 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 				fprintf(stderr, "open %s failed\n", rcmd->file);
 				exit(127);
 			}
+			runcmd(nsh_info, rcmd->cmd);
+
+			break;
+
+		case BACK:
+			bcmd = (struct backcmd *)cmd;
+			child_pid = forking();
+			if (child_pid == 0)
+				runcmd(nsh_info, bcmd->cmd);
+			
+			add_job(nsh_info, child_pid);
+
 			break;
 
 		default:
@@ -138,5 +136,7 @@ int runcmd(nsh_info_t *nsh_info, struct cmd *cmd)
 			break;
 	}
 
-	return (1);
+	freexit(nsh_info, EXIT_SUCCESS, 0);
+
+	return (EXIT_FAILURE);
 }
