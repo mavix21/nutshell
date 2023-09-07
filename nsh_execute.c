@@ -20,6 +20,8 @@ builtin_t nsh_bins[] = {
  */
 void handle_builtin(int signo, siginfo_t *info, void *context)
 {
+	(void)signo;
+	(void)context;
 	nsh_info_t nsh_info;
 	int fd = info->si_int; // file descriptor the child has written to
 	unsigned char buffer[sizeof(nsh_info_t)] = { 0 };
